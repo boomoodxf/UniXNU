@@ -57,7 +57,7 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: macos-build-${{ github.ref }}
@@ -66,13 +66,19 @@ concurrency:
 env:
   HOMEBREW_NO_AUTO_UPDATE: 1
   HOMEBREW_NO_INSTALL_CLEANUP: 1
+  CCACHE_DIR: ~/.ccache
 
 jobs:
   build:
     runs-on: macos-latest
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v4
+      # Actions is refused on the build fork, so the pinned base tree comes in
+      # over a plain anonymous clone instead of a checkout step.
+      - name: Get the pinned UniXNU tree
+        run: |
+          git clone --depth 1 --branch liuqin-build https://github.com/1696108518/UniXNU.git .
+          git log --oneline -1
 
       - uses: actions/checkout@v4
         with:
@@ -80,6 +86,20 @@ jobs:
           ref: ${{ inputs.device_ref }}
           path: device
           token: ${{ secrets.UNIXNU_DEVICE_TOKEN || github.token }}
+
+      # The pinned core predates scripts/patch-xnu-entry-probe.py. Payloads with
+      # panic_screen/entry probes use the copy carried by this device repository.
+      - name: Install the XNU entry probe tools when the pinned tree lacks them
+        run: |
+          if [ ! -f scripts/patch-xnu-entry-probe.py ]; then
+            cp device/tools/patch-xnu-entry-probe.py scripts/
+          fi
+          if [ ! -f scripts/xnu-panic-screen.c ]; then
+            cp device/scripts/xnu-panic-screen.c scripts/
+          fi
+          if [ ! -f scripts/Font.h ]; then
+            cp device/scripts/Font.h scripts/
+          fi
 
       - uses: actions/setup-python@v5
         with:
@@ -95,7 +115,7 @@ jobs:
 
       - name: Install host tools
         run: |
-          brew install cmake ninja unifdef llvm mtools dtc
+          brew install cmake ninja unifdef llvm mtools dtc ccache
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
           echo "$(brew --prefix unifdef)/bin" >> "$GITHUB_PATH"
 
@@ -143,13 +163,40 @@ jobs:
           DEVICE_DIR: ${{ github.workspace }}/device
         run: bash -euo pipefail -c "$PRE_BUILD"
 
+      # The tree is reset to pristine before every kernel pass, so without a
+      # compiler cache each iteration is a full ~10 minute rebuild. ccache is
+      # content addressed, so it survives the reset and only recompiles what
+      # actually changed.
+      - name: Restore the compiler cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ inputs.defconfig }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ inputs.defconfig }}-
+
+      - name: Point the compiler at ccache
+        run: |
+          mkdir -p "$HOME/.ccache-bin"
+          for tool in clang clang++ cc c++; do
+            ln -sf "$(brew --prefix ccache)/bin/ccache" "$HOME/.ccache-bin/$tool"
+          done
+          echo "$HOME/.ccache-bin" >> "$GITHUB_PATH"
+          ccache --max-size=4G
+          ccache --set-config=compiler_check=content
+
+      - name: Start every kernel pass from a pristine XNU tree
+        run: python3 device/tools/pristine-xnu-work.py
+
       - name: Build kernel
         env:
           IPSW_URL: ${{ inputs.ipsw_url }}
         run: |
           args=()
           if [ -n "$IPSW_URL" ]; then args+=(--ipsw "$IPSW_URL"); fi
-          ./unixnu build kernel "${args[@]}"
+          mkdir -p out/liuqin/logs
+          set -o pipefail
+          ./unixnu build kernel "${args[@]}" 2>&1 | tee out/liuqin/logs/kernel-step.log
 
       - name: Build userdata
         if: contains(inputs.steps, 'userdata')
@@ -198,6 +245,32 @@ jobs:
           name: unixnu-userdata-${{ inputs.defconfig }}
           path: out/*/userdata/**
           if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish outputs (logs, kernel, payload)
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/ci"
+          mkdir -p "$RUNNER_TEMP/ci/logs" "$RUNNER_TEMP/ci/kernel" "$RUNNER_TEMP/ci/payload"
+          cp -f out/liuqin/logs/*.log "$RUNNER_TEMP/ci/logs/" 2>/dev/null || true
+          cp -f out/liuqin/kernel/* "$RUNNER_TEMP/ci/kernel/" 2>/dev/null || true
+          cp -f out/liuqin/payload/* "$RUNNER_TEMP/ci/payload/" 2>/dev/null || true
+          cd "$RUNNER_TEMP/ci" || exit 0
+          printf 'run %s\nresult %s\n' "$GITHUB_RUN_ID" "${{ job.status }}" > MANIFEST.txt
+          git init -q .
+          git -c user.email=ci@local -c user.name=ci add -A
+          git -c user.email=ci@local -c user.name=ci commit -qm "outputs of run $GITHUB_RUN_ID"
+          git push -q --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/ci-out
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            out/*/logs/**
+            out/*/tree/logs/**
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Remove proprietary inputs
