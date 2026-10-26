@@ -1,0 +1,22 @@
+== submodules /Users/runner/work/UniXNU/UniXNU
+== tree /Users/runner/work/UniXNU/UniXNU/out/liuqin/tree
+== kernel: XNU
+== kernel: bootstrap pass for the compile records
++ bash /Users/runner/work/UniXNU/UniXNU/out/liuqin/tree/scripts/build-xnu-4k-baseline.sh
+== kernel: prepare storage headers
++ python3 /Users/runner/work/UniXNU/UniXNU/out/liuqin/tree/scripts/prepare-storage-headers.py
+== kernel: archive 1/5: build-corecrypto-14.py
++ python3 /Users/runner/work/UniXNU/UniXNU/out/liuqin/tree/scripts/build-corecrypto-14.py
+== kernel: archive 2/5: build-corecrypto-14.py --namespace
++ python3 /Users/runner/work/UniXNU/UniXNU/out/liuqin/tree/scripts/build-corecrypto-14.py --namespace
+== kernel: archive 3/5: build-arm-driver.py ArmDTPlatform
++ python3 /Users/runner/work/UniXNU/UniXNU/out/liuqin/tree/scripts/build-arm-driver.py ArmDTPlatform
+== kernel: archive 4/5: build-arm-driver.py ArmCpu
++ python3 /Users/runner/work/UniXNU/UniXNU/out/liuqin/tree/scripts/build-arm-driver.py ArmCpu
+== kernel: archive 5/5: build-libpthread-kernel.py
++ python3 /Users/runner/work/UniXNU/UniXNU/out/liuqin/tree/scripts/build-libpthread-kernel.py
++ bash /Users/runner/work/UniXNU/UniXNU/out/liuqin/tree/scripts/build-xnu-4k-baseline.sh
+== kernel: prelink
+== ipsw: remote https://updates.cdn-apple.com/2025SpringFCS/fullrestores/122-77166/DCA6CFE8-90E9-4B92-880D-3DE171798E40/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw
++ python3 /Users/runner/work/UniXNU/UniXNU/out/liuqin/tree/kits/NativePrelink/emit_prelink.py --kernel /Users/runner/work/UniXNU/UniXNU/out/liuqin/tree/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped.noctf --prelinked /Users/runner/work/UniXNU/UniXNU/out/ipsw/21H461/kernelcache.decompressed --slide=-0x1000000 --output /Users/runner/work/UniXNU/UniXNU/out/liuqin/kernel/kernel.macho --root com.apple.AppleFSCompression.AppleFSCompressionTypeZlib --root com.apple.driver.AppleARMPlatform --root com.apple.driver.AppleARMWatchdogTimer --root com.apple.driver.AppleAudioClockLibs --root com.apple.driver.AppleEffaceableStorage --root com.apple.driver.AppleIISController --root com.apple.driver.AppleM2ScalerCSCDriver --root com.apple.driver.AppleMobileFileIntegrity --root com.apple.driver.ApplePMGR --root com.apple.driver.IODARTFamily --root com.apple.filesystems.apfs --root com.apple.iokit.CoreAnalyticsFamily --root com.apple.iokit.IOAVFamily --root com.apple.iokit.IOAudio2Family --root com.apple.iokit.IOCECFamily --root com.apple.iokit.IOCryptoAcceleratorFamily --root com.apple.iokit.IOGPUFamily --root com.apple.iokit.IOHDCPFamily --root com.apple.iokit.IOMobileGraphicsFamily --root com.apple.iokit.IOReportFamily --root com.apple.iokit.IOSlowAdaptiveClockingFamily --root com.apple.iokit.IOStorageFamily --root com.apple.iokit.IOSurface --root com.apple.kec.Libm --root com.apple.kec.corecrypto --root com.apple.kext.AppleMatch --root com.apple.kext.CoreTrust --root com.apple.security.AppleImage4 --root com.apple.security.sandbox --root com.apple.iokit.IOHIDFamily --root com.apple.iokit.IOHIDEventDriver --early-security-init com.apple.driver.AppleMobileFileIntegrity=0xfffffff005ab4ae0
+== kernel: /Users/runner/work/UniXNU/UniXNU/out/liuqin/kernel/kernel.macho sha256 91b55b9e2eda72b2c4c41a086cdc9650d19271b32155ada8d1cb99aceba12fcb
